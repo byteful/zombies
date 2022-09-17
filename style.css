@@ -1,0 +1,19 @@
+@font-face {
+  font-family: 'GeminiMoon';
+  font-stretch: normal;
+  src: url('Gemini Moon.otf') format('truetype');
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'AloneOnEarth';
+  font-stretch: normal;
+  src: url('Alone On Earth.otf') format('truetype');
+  font-style: normal;
+}
+
+body {
+  overflow: hidden;
+  margin: 0 auto;
+  font-family: 'AloneOnEarth';
+}
