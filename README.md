@@ -1,3 +1,5 @@
-# Zombie Wave Game (name WIP)
+can access with
+- zombies.byteful.me
+- zombies.byteful.repl.co
 
-## Features
+whichever works, enjoy!
