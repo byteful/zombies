@@ -14,18 +14,28 @@ class Drawable {
   update() { }
 
   draw() {
-    if (!this.doDraw) {
+    if (!this.doDraw || !isOnScreen(this.x, this.y)) {
       return
+    }
+
+    if(frameRate() < 40) {
+      for (let other of drawnCycle) {
+        let d = distSquared(other.x, other.y, this.x, this.y); //dist(other.x, other.y, this.x, this.y)
+        if(d <= 2) {
+          return
+        }
+      }
     }
 
     stroke(0)
     strokeWeight(this.stroke)
     fill(this.color)
-    if(this.isEllipse) {
+    if (this.isEllipse) {
       ellipse(this.x, this.y, this.size)
     } else {
       rect(this.x, this.y, this.size, this.size)
     }
+    drawnCycle.push(this);
   }
 }
 
@@ -44,11 +54,11 @@ class MovingText {
   }
 
   update() {
-    let d = dist(this.x, this.y, this.endX, this.endY)
-    if(d <= 1) {
+    let d = distSquared(this.x, this.y, this.endX, this.endY)
+    if (d <= 2) {
       this.doDraw = false;
     }
-    
+
     let vec = createVector(this.x - this.endX, this.y - this.endY);
     vec.normalize();
     this.x -= vec.x * (MOVE_SPEED + this.speed);
@@ -66,6 +76,53 @@ class MovingText {
   }
 }
 
+class HealthAbility extends Drawable {
+  constructor(x, y, player) {
+    super(x, y, [235, 33, 46])
+    this.player = player;
+    this.isEllipse = true;
+    this.size = 15;
+  }
+
+  update() {
+    if (dist(this.x, this.y, this.player.x, this.player.y) < 30) {
+      this.player.data.health = 100;
+      this.doDraw = false;
+    }
+  }
+
+  draw() {
+    noStroke()
+    fill(255, 255, 100, 4)
+    ellipse(this.x, this.y, this.size + 20)
+    super.draw()
+  }
+}
+
+class CoinMagnet extends Drawable {
+  constructor(x, y, player) {
+    super(x, y, [192, 192, 192])
+    this.player = player;
+    this.isEllipse = true;
+    this.size = 15;
+  }
+
+  update() {
+    if (dist(this.x, this.y, this.player.x, this.player.y) < 30) {
+      this.player.pickupReach = 500;
+      setTimeout(() => this.player.pickupReach = 100, 10000);
+      this.doDraw = false;
+    }
+  }
+
+  draw() {
+    noStroke()
+    fill(255, 255, 100, 4)
+    ellipse(this.x, this.y, this.size + 20)
+    super.draw()
+  }
+}
+
 class DroppedCoin extends Drawable {
   constructor(x, y, amount) {
     super(x, y, [225, 181, 48])
@@ -73,6 +130,21 @@ class DroppedCoin extends Drawable {
     this.size = 10;
     this.stroke = 3;
     this.isEllipse = true;
+    this.isMovingTo = false;
+  }
+
+  update() {
+    if (this.isMovingTo) {
+      if (dist(this.x, this.y, this.moveTo.x, this.moveTo.y) <= 4) {
+        this.doDraw = false;
+        this.isMovingTo = false;
+      }
+
+      let vec = createVector(this.x - this.moveTo.x, this.y - this.moveTo.y);
+      vec.normalize();
+      this.x -= vec.x * (6);
+      this.y -= vec.y * (6);
+    }
   }
 }
 
@@ -84,7 +156,9 @@ class Zombie extends Drawable {
     this.damageTick = 0;
     this.frozen = false;
     this.freeRoamTick = 1000;
-    this.strength = random(0.5, 0.9)
+    this.strength = random(1, 3 + this.player.data.wave);
+    this.maxHealth = this.strength;
+    this.attackCooldown = 0;
   }
 
   update() {
@@ -96,7 +170,7 @@ class Zombie extends Drawable {
       return
     }
 
-    this.speed += 0.001
+    this.speed += (this.player.data.wave / 1000)
 
     let vec = createVector(this.x - this.player.x, this.y - this.player.y);
     vec.normalize();
@@ -104,13 +178,30 @@ class Zombie extends Drawable {
     this.y -= vec.y * (MOVE_SPEED + this.speed);
 
     if (this.damageTick++ >= 20 && dist(this.x + 15, this.y + 15, this.player.x + 15, this.player.y + 15) <= 30) {
-      let debuff = Math.round(Math.max(this.player.data.health - (random(1,3) + ((this.player.data.wave - 1)*1.2)), 0))
+      let debuff = Math.round(Math.max(this.player.data.health - (random(1, 3) + ((this.player.data.wave - 1) * 1.1)), 0))
       movingTexts.push(new MovingText(250, windowHeight - 75, 250, windowHeight + 20, '-' + (this.player.data.health - debuff), [235, 33, 46]))
       this.player.data.health = debuff;
       this.damageTick = 0;
       this.frozen = true;
-      setTimeout(() => this.frozen = false, 1500)
+      setTimeout(() => this.frozen = false, 3500)
     }
+  }
+
+  draw() {
+    super.draw()
+
+    if (this.strength === this.maxHealth) {
+      return
+    }
+
+    let w = map(this.strength, 0, this.maxHealth, 0, 30)
+    fill(0)
+    stroke(0)
+    strokeWeight(1)
+    rectMode(CORNER)
+    rect(this.x, this.y + 35, 30, 5, 10)
+    fill(235, 33, 46)
+    rect(this.x, this.y + 35, w, 5, 10)
   }
 }
 
@@ -138,6 +229,7 @@ class Player extends Drawable {
       wave: 1
     };
     this.lastHealth = this.data.health;
+    this.pickupReach = 100;
   }
 
   update() {
@@ -194,18 +286,28 @@ class Player extends Drawable {
       this.attackingTick += this.data.attackSpeed;
       if (this.attackingTick >= this.data.maxAttackingTick) {
         this.attackingTick = 0;
+        for (let z of this.zombies) {
+          z.attackCooldown = 0;
+        }
       }
       // attack
       for (let zombie of this.zombies) {
-        if (dist(zombie.x, zombie.y, this.x, this.y) <= (this.attackingTick / 2) && Math.random() > zombie.strength) {
-          zombie.doDraw = false;
-          killedZombiesInWave++;
-          if(killedZombiesInWave % 50 === 0) {
-            this.data.health = Math.min(100, this.data.health + 30);
-            // rect 20, windowHeight - 100, player.data.health * 2, 50
-            movingTexts.push(new MovingText(25, windowHeight - 75, player.data.health * 2, windowHeight - 75, '+', 255, 80))
+        if (--zombie.attackCooldown <= 0 && dist(zombie.x, zombie.y, this.x, this.y) <= (this.attackingTick / 2)) {
+          zombie.strength = zombie.strength - random(1, 3);
+          if (zombie.strength <= 0) {
+            zombie.doDraw = false;
+            killedZombiesInWave++;
+            if (killedZombiesInWave % 50 === 0) {
+              this.data.health = Math.min(100, this.data.health + 30);
+              // rect 20, windowHeight - 100, player.data.health * 2, 50
+              movingTexts.push(new MovingText(25, windowHeight - 75, player.data.health * 2, windowHeight - 75, '+', 255, 80))
+            }
+            coins.push(new DroppedCoin(zombie.x, zombie.y, (random(1, 3 + this.data.wave) * this.data.coinMultiplier)))
+            continue
           }
-          coins.push(new DroppedCoin(zombie.x, zombie.y, (random(1,3 + this.data.wave) * this.data.coinMultiplier)))
+          zombie.attackCooldown = 20;
+          zombie.frozen = true;
+          setTimeout(() => zombie.frozen = false, 300)
         }
       }
     } else {
@@ -213,27 +315,33 @@ class Player extends Drawable {
     }
 
     for (let coin of coins) {
-      if(dist(coin.x, coin.y, this.x + 15, this.y + 15) <= 35) {
-        coin.doDraw = false;
-        this.data.kills+=coin.amount;
+      if (coin.isMovingToPlayer) {
+        coin.moveTo = { x: this.x + 15, y: this.y + 15 };
+      }
+
+      if (dist(coin.x, coin.y, this.x + 15, this.y + 15) <= this.pickupReach && coin.doDraw && !coin.isMovingTo) {
+        coin.moveTo = { x: this.x + 15, y: this.y + 15 };
+        coin.isMovingTo = true;
+        coin.isMovingToPlayer = true;
+        this.data.kills += coin.amount;
         movingTexts.push(new MovingText(20 - 5, windowHeight - 130, 20 - 5, windowHeight - 230, '+' + numberWithCommas(coin.amount) + " ⛁", 0))
       }
     }
 
     if (this.isMovingLeft && this.x <= 4970) {
-      this.x += MOVE_SPEED;
+      this.x += MOVE_SPEED + 1;
     }
 
     if (this.isMovingRight && this.x >= -5000) {
-      this.x -= MOVE_SPEED;
+      this.x -= MOVE_SPEED + 1;
     }
 
     if (this.isMovingUp && this.y >= -5000) {
-      this.y -= MOVE_SPEED;
+      this.y -= MOVE_SPEED + 1;
     }
 
     if (this.isMovingDown && this.y <= 4970) {
-      this.y += MOVE_SPEED;
+      this.y += MOVE_SPEED + 1;
     }
   }
 
@@ -251,15 +359,16 @@ class Player extends Drawable {
   }
 
   save() {
-    document.cookie = JSON.stringify(this.data)
+    localStorage.setItem("save", JSON.stringify(this.data));
   }
 
   load() {
-    if (!document.cookie) {
+    let loaded = localStorage.getItem("save");
+    if (!loaded) {
       return;
     }
 
-    this.data = JSON.parse(document.cookie)
+    this.data = JSON.parse(loaded)
     this.data.health = 100; // wave system now so yeah
     this.lastHealth = this.data.health;
   }

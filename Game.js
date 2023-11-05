@@ -1,9 +1,19 @@
+p5.disableFriendlyErrors = true;
+function distSquared(x1, y1, x2, y2) {
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    return dx * dx + dy * dy;
+}
+
 let player;
 const zombies = [];
 const rocks = [];
 const coins = [];
 const movingTexts = [];
+const abilities = [];
 let paused = false;
+
+const drawnCycle = [];
 
 let zombiesSpawned = 0;
 let killedZombiesInWave = 0;
@@ -15,7 +25,7 @@ let waitingFor = 0;
 
 let helpMenuDisplayed = true;
 
-const rockColors = [[90,76,66,200], [106,57,9,200], [105,102,92,200], [163,162,165,200], [99,95,98,200]]
+const rockColors = [[90, 76, 66, 200], [106, 57, 9, 200], [105, 102, 92, 200], [163, 162, 165, 200], [99, 95, 98, 200]]
 
 // Setup P5.JS
 
@@ -24,10 +34,10 @@ function setup() {
   player = new Player(windowWidth / 2, windowHeight / 2, zombies);
   player.load()
 
-  for (let x = -5000; x <= 5000; x+=10) {
-    for (let y = -5000; y <= 5000; y+=10) {
-      if(Math.random() > 0.98) {
-        rocks.push({x: x, y: y, fill: rockColors[Math.floor(random(0, 5))], size: random(5, 10)})
+  for (let x = -5000; x <= 5000; x += 10) {
+    for (let y = -5000; y <= 5000; y += 10) {
+      if (Math.random() > 0.98) {
+        rocks.push({ x: x, y: y, fill: rockColors[Math.floor(random(0, 5))], size: random(5, 10) })
       }
     }
   }
@@ -92,12 +102,12 @@ function drawGUI() {
     text('Upgrades', windowWidth / 2, 100)
 
     // draw boxes for each upgrade stat
-    let attackSpeedPrice = (((player.data.attackSpeed + 1) ** 1.2) * 50).toFixed(2)
-    let attackRadiusPrice = ((player.data.maxAttackingTick + 10) ** 1.2).toFixed(2)
-    let coinMultiplierPrice = (((player.data.coinMultiplier + 0.1) ** 1.2) * 150).toFixed(2)
+    let attackSpeedPrice = (((player.data.attackSpeed + 1) ** 1.1) * 20 * player.data.wave).toFixed(2)
+    let attackRadiusPrice = ((player.data.maxAttackingTick + 10) ** 1.1 * player.data.wave).toFixed(2)
+    let coinMultiplierPrice = (((player.data.coinMultiplier + 0.1) ** 1) * 50 * player.data.wave).toFixed(2)
     rectMode(CENTER)
 
-    if(player.data.kills >= attackSpeedPrice) {
+    if (player.data.kills >= attackSpeedPrice) {
       fill(92, 219, 92, isMouseOverRect(windowWidth / 2, 200, 400, 100) ? 200 : 60)
     } else {
       fill(255, 0, 33, isMouseOverRect(windowWidth / 2, 200, 400, 100) ? 200 : 60)
@@ -113,15 +123,15 @@ function drawGUI() {
     text('Attack Speed: ' + numberWithCommas(player.data.attackSpeed) + " >> " + numberWithCommas(player.data.attackSpeed + 1), windowWidth / 2 - 190, 200)
     textAlign(RIGHT, CENTER)
     text(numberWithCommas(attackSpeedPrice) + " ⛁", windowWidth / 2 + 190, 200)
-    
-    if(mouseIsPressed && isMouseOverRect(windowWidth / 2, 200, 400, 100) && player.data.kills >= attackSpeedPrice) {
+
+    if (mouseIsPressed && isMouseOverRect(windowWidth / 2, 200, 400, 100) && player.data.kills >= attackSpeedPrice) {
       player.data.attackSpeed += 1;
       player.data.kills -= attackSpeedPrice;
       mouseIsPressed = false;
     }
     //
 
-    if(player.data.kills >= attackRadiusPrice) {
+    if (player.data.kills >= attackRadiusPrice) {
       fill(92, 219, 92, isMouseOverRect(windowWidth / 2, 350, 400, 100) ? 200 : 60)
     } else {
       fill(255, 0, 33, isMouseOverRect(windowWidth / 2, 350, 400, 100) ? 200 : 60)
@@ -137,15 +147,15 @@ function drawGUI() {
     text('Attack Radius: ' + numberWithCommas(player.data.maxAttackingTick) + " >> " + numberWithCommas(player.data.maxAttackingTick + 10), windowWidth / 2 - 190, 350)
     textAlign(RIGHT, CENTER)
     text(numberWithCommas(attackRadiusPrice) + " ⛁", windowWidth / 2 + 190, 350)
-    
-    if(mouseIsPressed && isMouseOverRect(windowWidth / 2, 350, 400, 100) && player.data.kills >= attackRadiusPrice) {
+
+    if (mouseIsPressed && isMouseOverRect(windowWidth / 2, 350, 400, 100) && player.data.kills >= attackRadiusPrice) {
       player.data.maxAttackingTick += 10;
       player.data.kills -= attackRadiusPrice;
       mouseIsPressed = false;
     }
-    
+
     //
-    if(player.data.kills >= coinMultiplierPrice) {
+    if (player.data.kills >= coinMultiplierPrice) {
       fill(92, 219, 92, isMouseOverRect(windowWidth / 2, 500, 400, 100) ? 200 : 60)
     } else {
       fill(255, 0, 33, isMouseOverRect(windowWidth / 2, 500, 400, 100) ? 200 : 60)
@@ -161,8 +171,8 @@ function drawGUI() {
     text('Coin Multiplier: ' + numberWithCommas(player.data.coinMultiplier) + " >> " + numberWithCommas(player.data.coinMultiplier + 0.1), windowWidth / 2 - 190, 500)
     textAlign(RIGHT, CENTER)
     text(numberWithCommas(coinMultiplierPrice) + " ⛁", windowWidth / 2 + 190, 500)
-    
-    if(mouseIsPressed && isMouseOverRect(windowWidth / 2, 500, 400, 100) && player.data.kills >= coinMultiplierPrice) {
+
+    if (mouseIsPressed && isMouseOverRect(windowWidth / 2, 500, 400, 100) && player.data.kills >= coinMultiplierPrice) {
       player.data.coinMultiplier += 0.1;
       player.data.kills -= coinMultiplierPrice;
       mouseIsPressed = false;
@@ -226,11 +236,58 @@ function drawGUI() {
       drawable.draw();
     }
   }
+
+  // mini map
+  push()
+
+  ellipseMode(CENTER)
+  fill(155, 118, 83)
+  stroke(116, 89, 62)
+  strokeWeight(5)
+  rect(windowWidth - 220, windowHeight - 220, 200, 200)
+
+  noStroke()
+  fill(119, 221, 118)
+
+  for (let zombie of zombies) {
+    if(!zombie.doDraw) {
+      continue
+    }
+    let x = map(zombie.x, -5000, 5000, windowWidth - 220, windowWidth - 20)
+    let y = map(zombie.y, -5000, 5000, windowHeight - 220, windowHeight - 20)
+    
+    ellipse(x, y, 5)
+  }
+
+  for (let ability of abilities) {
+    if(!ability.doDraw) {
+      continue
+    }
+    if(ability instanceof HealthAbility) {
+      fill(235, 33, 46)
+    }
+    if(ability instanceof CoinMagnet) {
+      fill(192, 192, 192)
+    }
+    let x = map(ability.x, -5000, 5000, windowWidth - 220, windowWidth - 20)
+    let y = map(ability.y, -5000, 5000, windowHeight - 220, windowHeight - 20)
+    
+    ellipse(x, y, 5)
+  }
+
+  let x = map(player.x, -5000, 5000, windowWidth - 220, windowWidth - 20)
+  let y = map(player.y, -5000, 5000, windowHeight - 220, windowHeight - 20)
+  let size = player.data.maxAttackingTick / (100 / 5) //map(player.data.maxAttackingTick, -5000, 5000, windowWidth - 220, windowWidth - 20)
+
+  fill(255)
+  ellipse(x, y, size)
+  
+  pop()
 }
 
 function drawBackgroundRocks() {
   for (let rock of rocks) {
-    if(isOnScreen(rock.x, rock.y)) {
+    if (isOnScreen(rock.x, rock.y)) {
       fill(rock.fill)
       noStroke()
       ellipse(rock.x, rock.y, rock.size)
@@ -254,6 +311,11 @@ function isOnScreen(x, y) {
   return x >= startingX && x <= endX && y >= startingY && y <= endY;
 }
 
+let healthAbilityTick = 0;
+let coinMagnetTick = 0;
+let optimizeTick = 0;
+let randomCoinsTick = 0;
+
 function draw() {
   background(155, 118, 83)
   //
@@ -270,7 +332,7 @@ function draw() {
   player.draw()
   player.save()
 
-  if(isWaiting && waitTick++ >= waitingFor) {
+  if (isWaiting && waitTick++ >= waitingFor) {
     isWaiting = false;
     waitTick = 0;
     waitingFor = 0;
@@ -278,12 +340,12 @@ function draw() {
     coins.splice(0, coins.length);
     movingTexts.push(new MovingText(0, windowHeight / 2, windowWidth, windowHeight / 2, 'Wave starting now!', 0, 32, true, 3))
   }
-  
-  if(!isWaiting && !stopSpawning) {
-    player.data.spawnSpeed = Math.max(0, player.data.spawnSpeed - 0.00001);
+
+  if (!isWaiting && !stopSpawning && zombies.length < 300) {
+    player.data.spawnSpeed = Math.max(0, player.data.spawnSpeed - 0.00005);
   }
-  if (Math.random() > player.data.spawnSpeed && !isWaiting && !stopSpawning) {
-    let zombieX = Math.random() > 0.5 ? random(player.x - windowWidth / 2 - 200,  player.x - windowWidth / 2 - 15) : random(windowWidth / 2 + player.x + 15, windowWidth / 2 + player.x + 200);
+  if (Math.random() > player.data.spawnSpeed && !isWaiting && !stopSpawning && zombies.length < 300) {
+    let zombieX = Math.random() > 0.5 ? random(player.x - windowWidth / 2 - 200, player.x - windowWidth / 2 - 15) : random(windowWidth / 2 + player.x + 15, windowWidth / 2 + player.x + 200);
     let zombieY = Math.random() > 0.5 ? random(player.y - windowHeight / 2 - 200, player.y - windowHeight / 2 - 15) : random(windowHeight / 2 + player.y + 15, windowHeight / 2 + player.y + 200);
     let zombieSpeed = random(-2.0, 0.3)
 
@@ -294,10 +356,10 @@ function draw() {
     // }
   }
 
-  if(zombiesSpawned >= (player.data.wave * 100)) {
+  if (zombiesSpawned >= (player.data.wave * 100)) {
     stopSpawning = true;
   }
-  if(killedZombiesInWave >= (player.data.wave * 100) && stopSpawning) {
+  if (killedZombiesInWave >= (player.data.wave * 100) && stopSpawning) {
     player.data.wave++;
     killedZombiesInWave = 0;
     zombiesSpawned = 0;
@@ -305,14 +367,52 @@ function draw() {
     wait(1000)
   }
 
+  if(randomCoinsTick++ >= 20 && coins.length < 500         ) {
+    coins.push(new DroppedCoin(random(-2000, 2000), random(-2000, 2000), random(1, 500)))
+    randomCoinsTick = 0;        
+  }
+
+  (async () => {
+    if (optimizeTick++ >= 100) {
+      for (let i = 0; i < coins.length; i++) {
+        let coin = coins[i];
+
+        if (!coin.doDraw) {
+          continue;
+        }
+
+        for (let j = i; j < coins.length; j++) {
+          let other = coins[j];
+          if (coin !== other && !other.isMovingTo && other.doDraw && dist(coin.x, coin.y, other.x, other.y) <= coins.length) {
+            other.moveTo = { x: coin.x, y: coin.y }
+            other.isMovingTo = true
+            coin.amount += other.amount;
+          }
+        }
+      }
+      optimizeTick = 0;
+    }
+  })()
+
   for (let i = 0; i < coins.length; i++) {
     let drawable = coins[i];
     drawable.update();
+    // merge
+    // if(i !== coins.length - 1) {
+    //   let next = coins[i+1]
+
+    //   if(dist(drawable.x, drawable.y, next.x, next.y) <= 15) {
+    //     drawable.doDraw = false;
+    //     next.amount += drawable.amount;
+    //   }
+    // }
     if (!drawable.doDraw) {
       coins.splice(i, 1);
       i--;
     } else {
-      drawable.draw();
+      if (i <= 300) {
+        drawable.draw();
+      }
     }
   }
 
@@ -323,12 +423,38 @@ function draw() {
       zombies.splice(i, 1);
       i--;
     } else {
-      drawable.draw();
+      if (i <= 500) {
+        drawable.draw();
+      }
+    }
+  }
+
+  if (abilities.length <= 20 && healthAbilityTick++ >= 100 && Math.random() > 0.99) {
+    healthAbilityTick = 0;
+    abilities.push(new HealthAbility(random(-4000, 4000), random(-4000, 4000), player));
+  }
+
+  if (abilities.length <= 20 && coinMagnetTick++ >= 100 && Math.random() > 0.99) {
+    coinMagnetTick = 0;
+    abilities.push(new CoinMagnet(random(-4000, 4000), random(-4000, 4000), player));
+  }
+
+  for (let i = 0; i < abilities.length; i++) {
+    let drawable = abilities[i];
+    drawable.update();
+    if (!drawable.doDraw) {
+      abilities.splice(i, 1);
+      i--;
+    } else {
+      if (i <= 20) {
+        drawable.draw();
+      }
     }
   }
 
   pop()
   drawGUI()
+  drawnCycle.splice(0, drawnCycle.length);
 }
 
 function windowResized() {
@@ -404,8 +530,8 @@ function mousePressed() {
     }
     paused = false;
   }
-  
-  if(isMouseOverRect(windowWidth / 2, windowHeight - 70, 160, 80) && !player.data.isUpgrading && !paused && !player.data.displayDead) {
+
+  if (isMouseOverRect(windowWidth / 2, windowHeight - 70, 160, 80) && !player.data.isUpgrading && !paused && !player.data.displayDead) {
     paused = true;
     player.data.isUpgrading = true;
   }
@@ -416,7 +542,7 @@ function mousePressed() {
 }
 
 function numberWithCommas(x) {
-    return Number(x).toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); //x.toString().includes('.') ? new Number(x).toFixed(2) : x.toLocaleString('en'); //x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
+  return Number(x).toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); //x.toString().includes('.') ? new Number(x).toFixed(2) : x.toLocaleString('en'); //x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
 }
 
 function isMouseOverRect(x, y, w, h) {
